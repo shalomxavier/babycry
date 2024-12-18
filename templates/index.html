@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Baby Cry Classifier</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: url('/static/baby.jpg') no-repeat center center fixed;
+            background-size: cover;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.3);
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+        }
+
+        h1 {
+            margin-bottom: 1rem;
+            color: #333;
+        }
+
+        #result {
+            margin-top: 1rem;
+            font-size: 1.2rem;
+            color: black;
+            font-weight: bold;
+        }
+
+        button {
+            background-color: #007bff;
+            border: none;
+            color: #fff;
+            padding: 0.75rem 1.5rem;
+            border-radius: 5px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin: 0.5rem 0;
+        }
+
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        button:hover:not(:disabled) {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Record Crying Voice of The Baby</h1>
+        <button id="recordButton">Start Recording</button>
+        <button id="stopButton" disabled>Stop Recording</button>
+        <div id="result">
+            <p id="classResult"></p>
+            <p id="probabilityResult"></p>
+        </div>
+    </div>
+
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+
+        document.getElementById('recordButton').onclick = () => {
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    mediaRecorder = new MediaRecorder(stream);
+                    mediaRecorder.start();
+
+                    document.getElementById('recordButton').disabled = true;
+                    document.getElementById('stopButton').disabled = false;
+
+                    mediaRecorder.ondataavailable = event => {
+                        audioChunks.push(event.data);
+                    };
+                });
+        };
+
+        document.getElementById('stopButton').onclick = () => {
+            mediaRecorder.stop();
+
+            document.getElementById('recordButton').disabled = false;
+            document.getElementById('stopButton').disabled = true;
+
+            mediaRecorder.onstop = () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                const formData = new FormData();
+                formData.append('audio_data', audioBlob);
+
+                fetch('/save_audio', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        document.getElementById('classResult').innerText = 'Predicted Class: ' + data.predicted_class;
+                        document.getElementById('probabilityResult').innerText = 'Probability: ' + data.probability.toFixed(2) + '%';
+                    } else {
+                        alert('Failed to save audio');
+                    }
+                });
+
+                audioChunks = [];
+            };
+        };
+    </script>
+</body>
+</html>
